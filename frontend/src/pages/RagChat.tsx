@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { AlertCircle, Bot, FileText, Loader2, Send, Sparkles, User } from 'lucide-react'
+import api from '../services/api'
+import axios from 'axios'
 
 interface RagSource {
   title: string
@@ -36,32 +38,26 @@ export default function RagChat() {
     setAnswer(null)
 
     try {
-      // TODO: Replace this simulated response with the real RAG API call in the follow-up issue.
-      // Suggested integration point:
-      // const { data } = await api.post('/api/v1/rag/query', { question: trimmedQuestion })
-      // setAnswer({ answer: data.answer, sources: data.sources })
-      await new Promise((resolve) => setTimeout(resolve, 900)) // TODO (#73): replace with actual POST /api/v1/rag/query call
+      try {
+        const { data } = await api.post('/rag/query', { question: trimmedQuestion })
 
-      if (trimmedQuestion.toLowerCase().includes('error')) {
-        throw new Error('Simulated RAG service failure. Try another question.')
+        // Backend returns: { answer: string, answer_id?: string, sources?: string[] }
+        const sources: RagSource[] = (data.sources || []).map((s: string) => ({
+          title: s,
+          excerpt: '',
+        }))
+
+        setAnswer({
+          answer: data.answer || 'No answer returned.',
+          sources,
+        })
+      } catch (err) {
+        if (axios.isAxiosError(err) && err.response?.status === 503) {
+          setError('RAG knowledge base not ready (503). Try again after ingestion.')
+        } else {
+          setError(err instanceof Error ? err.message : 'Unable to generate an answer right now.')
+        }
       }
-
-      setAnswer({
-        answer:
-          'Based on the available compliance knowledge base, this question appears related to EU AI Act risk classification and documentation obligations. Once API wiring is added, this panel will show grounded answers generated from indexed regulatory sources.',
-        sources: [
-          {
-            title: 'EU AI Act - Risk Classification Guidance',
-            excerpt:
-              'High-risk AI systems require risk management, technical documentation, logging, transparency, human oversight, accuracy, robustness, and cybersecurity controls.',
-          },
-          {
-            title: 'AegisAI Compliance Knowledge Base',
-            excerpt:
-              'RAG responses should include source citations so users can verify which documents informed the generated answer.',
-          },
-        ],
-      })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to generate an answer right now.')
     } finally {
